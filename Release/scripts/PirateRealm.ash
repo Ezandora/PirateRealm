@@ -35,7 +35,7 @@ void RestoreArchivedEquipment()
 }
 string [string] __pirate_file_state;
 
-string __pirate_version = "1.0";
+string __pirate_version = "1.0.1";
 
 
 Record PirateRealmSettings
@@ -237,7 +237,7 @@ void pirateHandleShop()
 	}
 }
 
-boolean pirateRunSailingTurn()
+boolean pirateRunSailingTurn(buffer pirate_realm_page_text)
 {
 	parsePirateCharpaneState();
 	int [int] choice_adventures;
@@ -309,8 +309,40 @@ boolean pirateRunSailingTurn()
 	return false;
 }
 
-boolean pirateRunFightingTurn()
+boolean pirateRunFightingTurn(buffer pirate_realm_page_text)
 {
+	//Parse current island:
+	
+	string [string] gifs_to_islands = {
+	"island1.gif":"Crab Island",
+	"island2.gif":"Battle Island",
+	"island3.gif":"Plastic Skull Island",
+	"island4.gif":"Key Key",
+	"island5.gif":"Glass Island",
+	"island6.gif":"Dessert Island",
+	"island12.gif":"Jungle Island",
+	"island13.gif":"Isla Gublar",
+	"island14.gif":"Trash Island",
+	"island15.gif":"Cemetery Island",
+	"island16.gif":"Prison Island",
+	"island21.gif":"Signal Island",
+	"island22.gif":"Tiki Island",
+	"island23.gif":"Temple Island",
+	"island24.gif":"Red Roger's Fortress",
+	"island25.gif":"Glass Jack's Hideout",
+	"island26.gif":"Storm Island",
+	};
+	
+	string current_island = "";
+	foreach island_gif, island_name in gifs_to_islands
+	{
+		if (pirate_realm_page_text.contains_text(island_gif))
+		{
+			current_island = island_name;
+			break;
+		}
+	}
+	
 	int [int] choice_adventures;
 	//just assume all of these are 1s:
 	for choice_id from 1368 to 1385
@@ -347,8 +379,8 @@ boolean pirateRunFightingTurn()
 	{
 		combat_script += "skill stuffed mortar shell;";
 	}
-	//we would saucestorm first, but signal can't handle it
-	//FIXME only use saucestorm for lower level islands, and maybe do something about storm island
+	if ($skill[saucestorm].have_skill() && ($strings[Crab Island,Battle Island,Plastic Skull Island,Key Key,Glass Island,Dessert Island,Jungle Island,Isla Gublar,Trash Island,Cemetery Island,Prison Island] contains current_island)) //saucestorm first on low-level islands
+		combat_script += "skill saucestorm;repeat;";
 	if ($skill[saucegeyser].have_skill())
 		combat_script += "skill saucegeyser;repeat;";
 	if ($skill[weapon of the pastalord].have_skill())
@@ -356,8 +388,13 @@ boolean pirateRunFightingTurn()
 	if ($skill[saucestorm].have_skill())
 		combat_script += "skill saucestorm;repeat;";
 	//some combat item idk
-	
-	if (get_ccs_action(0) == "consult scripts/Helix Fossil/Helix Fossil.ash") //worship
+	if (current_island == "Storm Island")
+	{
+		//survive ten rounds with the seal tooth
+		retrieve_item(1, $item[seal tooth]);
+		combat_script += "use seal tooth;repeat;";
+	}
+	if (get_ccs_action(0) == "consult scripts/Helix Fossil/Helix Fossil.ash" && false) //worship
 		combat_script = "";
 	statCheck();
 	//cli_execute("gain.ash 1000000 item 1000 maxmeatspent");
@@ -422,6 +459,10 @@ void pirateStartRun()
 		first_mate_priorities["Wide-Eyed"] -= 100.0;
 		first_mate_priorities["Harquebusier"] -= 100.0;
 	}
+	if (__pr_settings.player_requested_islands["Tiki Island"]) //FIXME only if they don't
+	{
+		first_mate_priorities["Mixologist"] -= 5.0;
+	}
 	
 	float [int] each_first_mate_score;
 	int [int] first_mate_order;
@@ -461,14 +502,14 @@ void pirateRunLoop()
 		{
 			if (encountered_fighting && __pr_settings.key_only)
 				break;
-			boolean stop = pirateRunSailingTurn();
+			boolean stop = pirateRunSailingTurn(pirate_realm_page_text);
 			if (stop)
 				break;
 		}
 		else if (pirate_realm_page_text.contains_text("adventure.php?snarfblat=531"))
 		{
 			encountered_fighting = true;
-			boolean stop = pirateRunFightingTurn();
+			boolean stop = pirateRunFightingTurn(pirate_realm_page_text);
 			if (stop)
 				break;
 		}
@@ -604,11 +645,11 @@ void outputHelp()
 	"skull":"Skull Island",
 	"glass":"Glass Island",
 	"dinosaurs":"Isla Gublar",
-	"cemetary":"Cemetery Island",
+	"cemetery":"Cemetery Island",
 	"jungle":"Jungle Island",
 	"signal":"Signal Island",
 	"tiki":"Tiki Island",
-	"storm":"Storm Island (script will break)",
+	"storm":"Storm Island",
 	"temple":"Temple Island",
 	"trash":"Trash Island",
 	"prison":"Prison Island",
@@ -657,10 +698,10 @@ boolean pirateSetup(string arguments_in)
 			
 			√Signal Island - nothing
 			√Tiki Island - nothing
-			√Storm Island - nothing, but super dangerous, abort if we go there?
-			√Red Roger's Fortress - requires skull island + cemetary island + right crewmate
+			√Storm Island - nothing
+			√Red Roger's Fortress - requires skull island + cemetery island + right crewmate
 			Glass Jack's Hideout - Requires recursed compass, tricky to get
-			Temple Island - Requires you to equip all four pieces of Red Roger gear when entering the island #3 choice adventure.
+			√Temple Island - Requires you to equip all four pieces of Red Roger gear when entering the island #3 choice adventure.
 		*/
 		
 		string [string] simple_islands = {
@@ -673,6 +714,7 @@ boolean pirateSetup(string arguments_in)
 		"isla":"Isla Gublar",
 		"gublar":"Isla Gublar",
 		"jurassicpark":"Isla Gublar",
+		"cemetery":"Cemetery Island",
 		"cemetary":"Cemetery Island",
 		"jungle":"Jungle Island",
 		"signal":"Signal Island",
@@ -706,11 +748,11 @@ boolean pirateSetup(string arguments_in)
 		if (argument == "roger" || argument == "fortress" || argument == "red")
 		{
 			__pr_settings.island_1_order[__pr_settings.island_1_order.count()] = "Skull Island";
-			__pr_settings.island_2_order[__pr_settings.island_2_order.count()] = "Cemetary Island";
+			__pr_settings.island_2_order[__pr_settings.island_2_order.count()] = "Cemetery Island";
 			__pr_settings.island_3_order[__pr_settings.island_3_order.count()] = "Red Roger's Fortress";
 			__pr_settings.player_requested_islands["Red Roger's Fortress"] = true;
 			__pr_settings.player_requested_islands["Skull Island"] = true;
-			__pr_settings.player_requested_islands["Cemetary Island"] = true;
+			__pr_settings.player_requested_islands["Cemetery Island"] = true;
 		}
 		if (argument == "key" || argument == "keyonly")
 		{

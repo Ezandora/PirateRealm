@@ -31,7 +31,7 @@ Sail to specific islands:
 **prison:** Prison Island  
 **signal:** Signal Island  
 **skull:** Skull Island  
-**storm:** Storm Island (script will break)  
+**storm:** Storm Island
 **temple:** Temple Island  
 **tiki:** Tiki Island  
 **trash:** Trash Island  
