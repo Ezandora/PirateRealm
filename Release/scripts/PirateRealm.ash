@@ -35,7 +35,7 @@ void RestoreArchivedEquipment()
 }
 string [string] __pirate_file_state;
 
-string __pirate_version = "1.0.2";
+string __pirate_version = "1.0.3";
 
 
 Record PirateRealmSettings
@@ -79,9 +79,9 @@ void parseFunALog()
 			everything_unlocked = false;
 		}
 	}
-	if (everything_unlocked) return;
 	buffer page_text = visit_url("shop.php?whichshop=piraterealm");
 	if (!page_text.contains_text("You've had your fun, now spend it")) return;
+	if (everything_unlocked) return;
 	
 	foreach it in __pirate_store_unlockables
 	{
@@ -127,9 +127,21 @@ boolean [slot] runEquipment(boolean [item] equipment)
 				next_accessory_slot = $slot[acc3];
 		}
 		if (it.available_amount() == 0) continue;
-		if (it.equipped_amount() > 0) //equip() will fail because equip() is fragile
-			cli_execute("unequip " + it);
-		equip(s, it);
+		if (!it.can_equip()) continue;
+		if (it.equipped_amount() > 0) //equip() can fail because equip() is fragile
+		{
+			boolean unequip = false;
+			//if it's equipped in the wrong slot, unequip it first because errors
+			foreach s2 in $slots[hat,weapon,off-hand,back,shirt,pants,acc1,acc2,acc3,familiar]
+			{
+				item it2 = s2.equipped_item();
+				if (it2 == it && s2 != s)
+					unequip = true;
+        	}
+        	if (unequip)
+				cli_execute("unequip " + it);
+		}
+		boolean ignore = equip(s, it);
 		slots_used[s] = true;
 	}
 	return slots_used;
