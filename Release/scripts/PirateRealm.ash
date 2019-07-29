@@ -35,7 +35,7 @@ void RestoreArchivedEquipment()
 }
 string [string] __pirate_file_state;
 
-string __pirate_version = "1.0.1";
+string __pirate_version = "1.0.2";
 
 
 Record PirateRealmSettings
@@ -127,6 +127,8 @@ boolean [slot] runEquipment(boolean [item] equipment)
 				next_accessory_slot = $slot[acc3];
 		}
 		if (it.available_amount() == 0) continue;
+		if (it.equipped_amount() > 0) //equip() will fail because equip() is fragile
+			cli_execute("unequip " + it);
 		equip(s, it);
 		slots_used[s] = true;
 	}
@@ -391,7 +393,8 @@ boolean pirateRunFightingTurn(buffer pirate_realm_page_text)
 	if (current_island == "Storm Island")
 	{
 		//survive ten rounds with the seal tooth
-		retrieve_item(1, $item[seal tooth]);
+		if (can_interact())
+			retrieve_item(1, $item[seal tooth]);
 		combat_script += "use seal tooth;repeat;";
 	}
 	if (get_ccs_action(0) == "consult scripts/Helix Fossil/Helix Fossil.ash" && false) //worship
@@ -523,7 +526,7 @@ void pirateRunLoop()
 		{
 			if (my_adventures() < 40)
 			{
-				print("You'll need forty adventures to start.");
+				print("You'll need forty adventures to start.", "red");
 				return;
 			}
 			//Start!
@@ -797,6 +800,7 @@ boolean pirateSetup(string arguments_in)
 
 void main(string arguments)
 {
+	int starting_fun_points = get_property("availableFunPoints").to_int();
 	print("PirateRealm v" + __pirate_version);
 	ArchiveEquipment();
 	readPirateFileState();
@@ -808,13 +812,15 @@ void main(string arguments)
 	}
 	cli_execute("outfit birthday suit");
 	pirateRunLoop();
-	if ($item[PirateRealm fun-a-log].available_amount() > 0)
-	{
-		parseFunALog();
-	}
+	parseFunALog();
 	parsePirateCharpaneState();
-	if (__pirate_charpane_state["Fun"] > 0)
-		print("You have earned " + __pirate_charpane_state["Fun"] + " FunPoints.");
+	int point_delta = get_property("availableFunPoints").to_int() - starting_fun_points;
+	
+	if (point_delta > 0)
+		print("You have earned " + point_delta + " FunPoints today. (" + __pirate_charpane_state["Fun"] + " total)");
+	else if (__pirate_charpane_state["Fun"] > 0)
+		print("You have earned " + __pirate_charpane_state["Fun"] + " FunPoints total.");
+	
 	
 	RestoreArchivedEquipment();
 }
